@@ -1,0 +1,251 @@
+---
+Encoding: UTF-8 Unicode
+title: 'Exame de MOQ-13: PARTE 1'
+subtitle: "Problema 01 (5,0 pts)"
+author: 
+  - name: "Professora: Denise B. Ferrari"
+  - name: "Aluno:"
+  - name: "Vinícius de Pádua Dias Aráujo - Turma 22.2"
+date: 'Data: 22/11/2019'
+output:
+  html_document:
+    theme: sandstone
+    df_print: paged
+    number_sections: FALSE  
+---
+```{r include = FALSE}
+knitr::opts_chunk$set(eval = TRUE, echo = TRUE)
+```
+
+
+## Instruções:
+
+----
+
+1. As respostas serão avaliadas com relação à:  
+  (i) reprodutibilidade;  
+  (ii) correção; e  
+  (iii) completude da solução proposta, devendo incluir:
+
+    + Enunciado do problema  
+    + Apresentação da estratégia de solução  
+    + Resultados (resumos numéricos e gráficos)  
+    + Análise dos resultados obtidos  
+    + Código R comentado  
+    + Referências (textos, sites etc.)
+
+**OBS:**  
+Existe um volume enorme de código disponível na internet para resolver praticamente qualquer problema. O reuso de código obtido online é permitido, desde que citada a fonte (mesmo que tenha sido utilizada apenas como inspiração...)
+
+**Prazo: 06/12/2019**
+
+**Entregáveis:**
+
++ Todos os arquivos utilizados para realizar a tarefa, organizados em uma pasta, seguindo o modelo:  
+```
+[Turma-22-X]_[Nome-Aluno]_Exame-P1
+  |-data
+  |-img
+  |-[Turma-22-X]_[Nome-Aluno]_Exame-P1.html
+  |-[Turma-22-X]_[Nome-Aluno]_Exame-P1.Rmd
+```  
++ Submeter todo o material em uma pasta via **CLASSROOM**.
+
+
+## Introdução
+
+----
+
+Em um pronto-atendimento oftalmológico há 2 consultórios médicos. A clínica abre às 9h e os pacientes chegam de acordo com um processo de Poisson com taxa 10min, ou seja, este é o tempo esperado de chegada do primeiro cliente após a abertura da clínica. Os pacientes podem ser atendidos indiscriminadamente por qualquer um dos plantonistas. Ao chegar na clínica, o paciente aguarda até que um dos médicos esteja disponível. A duração de cada consulta é uma variável aleatória uniformemente distribuída entre 5 e 20 minutos. A clínica deixa de admitir novos pacientes às 16h e fecha após terminado o atendimento do último paciente.
+
+## PARTE 1:  Estratégia de Solução Computacional
+
+----
+
+Para simular a fila, faz-se necessário o controle do estado do sistema entre cada instante que acontece um evento. Um evento é aqui definido como um acontecimento de chegada ou saída de cliente. O estado do sistema é definido pelo número de clientes na fila, número de clientes sendo atendidos e número de clientes que já foram atendidos. Cada processo de final de atendimento em cada consultorio, chegada de cliente, saída de cliente será marcado em variáveis discretas.
+
+Toda vez que um cliente chega, será marcado esse tempo de chegada e então será verificado se há consultório livre. Marcam-se os acontecimentos de chegada por ordem de chegada dos pacientes para no final termos o tempo médio de espera. Além disso marcaremos o tempo de cada acontecimento, para obter o tempo a mais que o consultorio fica aberto, então, basta subtrair esse tempo do tempo total que a clinica fica aberta.
+
+O código foi inspirada na aula [Introdução a Simulação Estocática em R](http://www-di.inf.puc-rio.br/~lopes//inf2035/Simul-Eventos.pdf) 
+
+
+## PARTE 2: Solução via Simulação de Monte Carlo
+
+Solução Computacional
+
+> Escreva um programa em R para simular este processo apenas uma vez e responda às seguintes questões:
+
+A) Quantos pacientes vieram até a clínica?  
+B) Quantos pacientes tiveram que aguardar para serem atendidos?  
+C) Qual o tempo médio de espera?  
+D) A que horas a clínica fechou? 
+
+----
+
+O código abaixo é baseado na estratégia computacional acima descrita.
+
+```{r}
+
+# Limpa a área de trabalho
+Respostas <- function()
+{
+  rm(list = ls())
+  lambda <- 1/10
+  duracao <- 60*7 # de 9 a 16 se passam 7 horas
+  t <- 0 #tempo percorrido
+  n <- 0 #número de pessoas no sistema (fila + atendimento)
+  ta <- c(rexp(1,rate = lambda)) #tempo de entrada de cada paciente por ordem de chegada
+  td = NULL #tempo de partida de cada paciente por ordem de chegada
+  tld <- c(Inf,Inf) # tempo da ultimo partida dos dois consultórios
+  finished <- FALSE
+  tempoMedioDeEspera = 0
+  tempoFechou = 0 #tempo que o pronto atendimento terminou os atendimentos
+  numeroPacientes = 0
+  aguardou=0
+  
+  while(!finished){
+    #As duas primeiras condicionais servem para ver a ordem dos acontecimentos, executando o código nessa ordem
+    if ((ta[numeroPacientes+1] <= tld[1])&&(ta[numeroPacientes+1] <= duracao)) {
+      t <- ta[numeroPacientes+1]
+      numeroPacientes <- numeroPacientes+1
+      n <- n+1
+      #Claro que se um conaultório estiver desocupado quando o paciente chegar ele irá direto ao consultório
+      if (n == 1 || n == 2) {
+        tld[n] = t + runif(1, min = 5, max = 20)
+        td <- c(td, tld[n])
+        #Mantem-se sempre os tempos dos ultimos que sairam atualizados em ordem do menor para o maior
+        tld = sort.int(tld)
+        
+        }
+    ta <- c(ta, t + rexp(1,rate = lambda))
+  }
+  else if ((tld[1] < ta[numeroPacientes+1])&&(tld[1] <= duracao)) {
+    t <- tld[1]
+    n <- n-1
+    #Se após a saída dessa pessoa tiver apenas uma ou nem uma pessoa, então o consultório fica vago e na proxima iteração não há prospecção de saída de paciente dele
+    if (n == 0 || n == 1){
+      tld[1] <- Inf
+      tld = sort.int(tld)
+    }
+    else {
+      td <- c(td, t + runif(1, min = 5, max = 20))
+      aguardou=aguardou+1
+    }
+  }
+    #Se um dos tempos ultrapassar o horário de duração então não há mais chegadas e repete-se o processo até não haver mais pacientes sobrando
+  else if ((min(ta[numeroPacientes+1],tld[1]) > duracao) && (n > 0)) {
+    while(n>0){
+      t <- tld[1]
+      n <- n-1
+      if (n > 1) 
+        {
+          tld[1] <- t + runif(1,min = 5.0, max = 20)
+          td = c(td,tld[1])
+          tld = sort.int(tld)
+      }
+      if(n==1)
+      {
+        tld[1] = Inf
+        tld = sort.int(tld)
+      }
+    }
+  }
+  else {
+      tempoFechou = max(t-duracao,0)
+      finished = TRUE
+    }
+  }
+  tempoMedioDeEspera=mean(td-ta[1:numeroPacientes])
+  retorno=c(numeroPacientes,aguardou,tempoMedioDeEspera,tempoFechou)
+}
+```
+
+## PARTE 3: Simulação de Monte Carlo
+
+----
+
+> Utilize simulação de Monte Carlo para analisar a qualidade do atendimento prestado aos pacientes. As soluções devem ser dadas em termos da mediana estimada e de intervalos (aproximados) de 95% de confiança construídos a partir de 100 replicações independentes para cada uma das perguntas nos itens acima.
+
+> Não esqueça de fornecer resumos gráficos e numéricos para substanciar sua análise. 
+
+
+``` {r}
+numeroPacientes=rep(0,100)
+aguardou=rep(0,100)
+tempoMedioDeEspera=rep(0,100)
+horaFechou=rep(0,100)
+
+for (i in 1:100)
+{
+  t<-Respostas()
+  numeroPacientes[i] = t[1]
+  aguardou[i] = t[2]
+  tempoMedioDeEspera[i] = t[3]
+  horaFechou[i] = t[4]
+}
+#Visualização dos resutados
+
+#Calcula das medianass
+my.NumeroPacientes = round(median(numeroPacientes), 3)
+my.Aguardaram = round(median(aguardou), 3)
+my.TempoMedioDeEspera = round(median(tempoMedioDeEspera),3)
+my.TempoFechamento = round(median(horaFechou), 3)
+
+#Calculo dos intervalos de confiança de 95% para a mediana de cada resposta
+
+numeroPacientes.IC95 <- round(quantile(numeroPacientes, probs = c(0.0225, 0.975)), 3)
+aguardou.IC95 <- round(quantile(aguardou, probs = c(0.0225, 0.975)), 3)
+tempoMedioDeEspera.IC95 <- round(quantile(tempoMedioDeEspera, probs = c(0.0225, 0.975)), 3)
+horaFechou.IC95 <- round(quantile(horaFechou, probs = c(0.0225, 0.975)), 3)
+
+#Construção dos histogramas dos resultados obtidos
+  hist(numeroPacientes, freq = FALSE,
+       xlab = "",
+       col = "gray", 
+     main = "Histograma de quantos pacientes foram à clinica")
+  #Anotações nos graficos
+  mtext(paste("IC 95%: [", numeroPacientes.IC95[1],",", numeroPacientes.IC95[2], "]", "Mediana =", my.NumeroPacientes), 
+        side=1, line =2, cex = 0.8)
+  abline(v = my.NumeroPacientes, col = 2, lwd = 2, lty = "dashed")
+  abline(v = numeroPacientes.IC95, 
+         col = 4, lwd = 2, lty = "dashed")
+  
+  hist(aguardou, freq = FALSE,
+       xlab = "",
+       col = "gray", 
+     main = "Histograma de quantos tiveram que aguardar na fila")
+  #Anotações nos graficos
+  mtext(paste("IC 95%: [", aguardou.IC95[1],",", aguardou.IC95[2], "]", "Mediana =", my.Aguardaram), 
+        side=1, line =2, cex = 0.8)
+  abline(v = my.Aguardaram, col = 2, lwd = 2, lty = "dashed")
+  abline(v = aguardou.IC95, 
+         col = 4, lwd = 2, lty = "dashed")
+  
+  hist(tempoMedioDeEspera, freq = FALSE,
+       xlab = "",
+       col = "gray", 
+     main = "Hisograma do tempo médio de espera de cada paciente")
+  #Anotações nos graficos
+  mtext(paste("IC 95%: [", tempoMedioDeEspera.IC95[1],",", tempoMedioDeEspera.IC95[2], "]", "Mediana =", my.TempoMedioDeEspera), 
+        side=1, line =2, cex = 0.8)
+  abline(v = my.TempoMedioDeEspera, col = 2, lwd = 2, lty = "dashed")
+  abline(v = tempoMedioDeEspera.IC95, 
+         col = 4, lwd = 2, lty = "dashed")
+  
+  hist(horaFechou, freq = FALSE,
+       xlab = "",
+       col = "gray", 
+     main = "Hisograma de quantos minutos a mais a clinica ficou aberta")
+  #Anotações nos graficos
+  mtext(paste("IC 95%: [", horaFechou.IC95[1],",", horaFechou.IC95[2], "]", "Mediana =", my.TempoFechamento), 
+        side=1, line =2, cex = 0.8)
+  abline(v = my.TempoFechamento, col = 2, lwd = 2, lty = "dashed")
+  abline(v = horaFechou.IC95, 
+         col = 4, lwd = 2, lty = "dashed")
+
+```
+
+
+Analisando os histogramas, é possível notar que o atendimento tem uma qualidade boa. Pela análise dos intervalos de confiança da mediana, vemos que os valores de clientes se concentram perto da mediana esperada de 42 clientes, para o tempo total de 7h, considerando a taxa do processo de poisson dado. Apesar do relativamente alto número de pacientes que chegaram na clínica, a quantidade desses que aguardaram durante algum tempo na fila tem uma mediana de 10~11 clientes. Essa quantidade é, de certa forma, baixa, considerando que apenas em torno de $\frac{1}{4}$ dos clientes teve que esperar em alguma eventual fila. Além disso, vemos que o tempo médio de espera possui uma mediana em torno de 13.625 minutos. Esse tempo é, de certa forma, bom, já que um paciente pode demorar até 20 minutos em um consultório. Ademais, a efetividade da clinica se reflete na mediana dos horarios de fechamento da clinica. Vemos que o tempo que a clinica fica aberta a mais que o esperado é de apenas 3~5 minutos. Dessa forma, afirma-se que a qualidade do atendimento da clínica é boa.
+
+
